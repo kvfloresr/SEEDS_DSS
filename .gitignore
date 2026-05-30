@@ -216,7 +216,7 @@ __marimo__/
 node_modules/
 
 # Datos y salidas pesadas del proyecto
-data/
-models/
-test_images/
-reports/
+/data/
+/models/
+/test_images/
+/reports/
