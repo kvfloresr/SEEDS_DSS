@@ -1,0 +1,152 @@
+/* ======== ESTILO GENERAL ======== */
+body {
+background: linear-gradient(135deg, #e8f5e9 0%, #ffffff 100%);
+font-family: 'Poppins', sans-serif;
+color: #333;
+min-height: 100vh;
+overflow-x: hidden;
+}
+
+/* ======== NAVBAR ======== */
+.navbar {
+background: linear-gradient(90deg, #2d6a4f, #40916c);
+transition: all 0.3s ease;
+}
+
+.navbar-brand {
+font-weight: 700;
+letter-spacing: 0.5px;
+}
+
+.nav-link {
+color: #f8f9fa !important;
+font-weight: 500;
+transition: color 0.2s ease-in-out;
+}
+
+.nav-link:hover {
+color: #b7e4c7 !important;
+}
+
+/* ======== ALERTAS ======== */
+.alert {
+border: none;
+border-left: 6px solid #2d6a4f;
+box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* ======== CARDS ======== */
+.card {
+border: none;
+border-radius: 10px;
+box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+transition: all 0.3s ease;
+}
+
+.card:hover {
+transform: translateY(-4px);
+box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.card-header {
+font-weight: 600;
+background: linear-gradient(90deg, #74c69d, #52b788);
+color: #fff;
+}
+
+/* ======== BOTONES ======== */
+.btn-success {
+background: linear-gradient(90deg, #40916c, #2d6a4f);
+border: none;
+transition: transform 0.2s ease-in-out, box-shadow 0.3s;
+}
+
+.btn-success:hover {
+background: #1b4332;
+transform: translateY(-2px);
+box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btn-outline-success {
+border: 2px solid #52b788;
+color: #2d6a4f;
+transition: all 0.3s;
+}
+
+.btn-outline-success:hover {
+background-color: #52b788;
+color: #fff;
+}
+
+/* ======== LOGIN ======== */
+.login-card {
+margin-top: 80px;
+border-top: 6px solid #2d6a4f;
+animation: slideUp 0.8s ease;
+}
+
+@keyframes slideUp {
+from {
+    opacity: 0;
+    transform: translateY(30px);
+}
+to {
+    opacity: 1;
+    transform: translateY(0);
+}
+}
+
+/* ======== DASHBOARD ======== */
+.dashboard-card {
+transition: all 0.3s ease;
+background: #fff;
+border-radius: 12px;
+padding: 20px;
+text-align: center;
+}
+
+.dashboard-card:hover {
+transform: scale(1.03);
+background: linear-gradient(180deg, #ffffff, #e8f5e9);
+box-shadow: 0 6px 20px rgba(64, 145, 108, 0.2);
+}
+
+.dashboard-card h5 {
+color: #2d6a4f;
+font-weight: 600;
+}
+
+.dashboard-card p {
+color: #555;
+font-size: 0.95rem;
+}
+
+/* ======== TABLAS ======== */
+.table {
+background-color: #fff;
+border-radius: 10px;
+overflow: hidden;
+}
+
+.table thead {
+background-color: #52b788;
+color: #fff;
+font-weight: 600;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+background-color: #f6fff8;
+}
+
+/* ======== FORMULARIOS ======== */
+input.form-control,
+select.form-select {
+border: 1.5px solid #cce3de;
+transition: all 0.2s ease;
+}
+
+input.form-control:focus,
+select.form-select:focus {
+border-color: #74c69d;
+box-shadow: 0 0 5px rgba(116, 198, 157, 0.4);
+}

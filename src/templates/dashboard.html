@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="text-center my-4">
+<h2 class="fw-bold text-success animate__animated animate__fadeInDown">
+    Bienvenido(a), {{ name }}
+</h2>
+<p class="text-muted">Panel principal del Sistema SeedDSS</p>
+</div>
+
+<div class="row g-4 justify-content-center">
+<div class="col-lg-3 col-md-6">
+    <div class="card dashboard-card shadow-lg border-0">
+    <div class="card-body text-center">
+        <h4>Lotes</h4>
+        <p>Gestiona los lotes de semillas registrados.</p>
+        <a href="{{ url_for('lotes') }}" class="btn btn-success w-100 mt-2">Ver Lotes</a>
+    </div>
+    </div>
+</div>
+
+<div class="col-lg-3 col-md-6">
+    <div class="card dashboard-card shadow-lg border-0">
+    <div class="card-body text-center">
+        <h4>Muestras</h4>
+        <p>Asocia muestras y consulta registros a los lotes de semillas.</p>
+        <a href="{{ url_for('muestras') }}" class="btn btn-success w-100 mt-2">Ver Muestras</a>
+    </div>
+    </div>
+</div>
+
+{% if session.get('role_name') == 'Administrador' %}
+<div class="col-lg-3 col-md-6">
+    <div class="card dashboard-card shadow-lg border-0">
+    <div class="card-body text-center">
+        <h4>Usuarios</h4>
+        <p>Administra cuentas y permisos del sistema.</p>
+        <a href="{{ url_for('admin_panel') }}" class="btn btn-success w-100 mt-2">Usuarios</a>
+    </div>
+    </div>
+</div>
+{% endif %}
+
+
+</div>
+
+<hr class="my-5">
+
+<h4 class="text-success text-center mb-4">Historial de Análisis IA</h4>
+
+<div class="card shadow-sm">
+<div class="card-body">
+    {% if reports and reports|length > 0 %}
+    <table class="table table-striped table-bordered align-middle">
+        <thead class="table-success text-center">
+        <tr>
+            <th>Reporte ID</th>
+            <th>Clase Predicha</th>
+            <th>Probabilidad</th>
+            <th>Pureza Física</th>
+            <th>% Daño físico</th>
+            <th>Fecha</th>
+            <th>Observaciones</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for r in reports %}
+        <tr>
+            <td>{{ r.report_id }}</td>
+            <td>{{ r.predicted_class }}</td>
+            <td>{{ r.probability }}</td>
+            <td>{{ r.pureza_fisica }}</td>
+            <td>{{ r.defect_percentage }}</td>
+            <td>{{ r.generated_at }}</td>
+            <td>{{ r.observations }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="text-center text-muted py-3">Aún no hay análisis registrados.</div>
+    {% endif %}
+</div>
+</div>
+
+{% endblock %}
