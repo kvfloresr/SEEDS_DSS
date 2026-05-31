@@ -8,7 +8,7 @@ DB_PATH = "data/seed_dss.db"
 def get_sql_connection():
     conn = pyodbc.connect(
         'DRIVER={ODBC Driver 17 for SQL Server};'
-        'SERVER=LAPTOP-JMFAB5SN\\SQLEXPRESS;'
+        'SERVER=localhost\\SQLEXPRESS;'
         'DATABASE=SeedDSS;'
         'Trusted_Connection=yes;'
     )
@@ -586,5 +586,19 @@ def get_reports_sql(limit=10):
     c = conn.cursor()
     c.execute(f"SELECT TOP {limit} * FROM Reports ORDER BY generated_at DESC")
     rows = [dict(zip([col[0] for col in c.description], row)) for row in c.fetchall()]
+    conn.close()
+    return rows
+
+def get_producers(search=None):
+    conn = get_sql_connection()
+    cursor = conn.cursor()
+    query = "SELECT producer_id, name, cod_producer, phone, address FROM Producers"
+    params = []
+    if search:
+        query += " WHERE name LIKE ? OR cod_producer LIKE ?"
+        params = [f"%{search}%", f"%{search}%"]
+    cursor.execute(query, params)
+    cols = [c[0] for c in cursor.description]
+    rows = [dict(zip(cols, r)) for r in cursor.fetchall()]
     conn.close()
     return rows

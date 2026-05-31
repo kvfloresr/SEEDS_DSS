@@ -9,7 +9,7 @@ import seaborn as sns
 BASE = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE / "data" / "processed"
 MODEL_DIR = BASE / "models"
-model = tf.keras.models.load_model(MODEL_DIR / "seed_cnn.h5")
+model = tf.keras.models.load_model(MODEL_DIR / "best_model.keras")
 
 IMG_SIZE = (128,128)
 BATCH = 32

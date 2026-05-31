@@ -28,8 +28,27 @@ val_ds = tf.keras.utils.image_dataset_from_directory(
 )
 
 class_names = train_ds.class_names
+num_classes = len(class_names)
 print("Clases detectadas:", class_names)
 
+# --- Pesos por clase calculados automaticamente ---
+# Cuenta cuantas imagenes hay en cada carpeta de clase y arma los pesos.
+# Se adapta solo a cualquier numero de clases (5, 6, etc.), asi que nunca
+# vuelve a fallar por un desajuste como el del diccionario anterior.
+train_dir = os.path.join(DATA_DIR, "train")
+counts = []
+for cname in class_names:
+    cdir = os.path.join(train_dir, cname)
+    n = len([f for f in os.listdir(cdir)
+            if os.path.isfile(os.path.join(cdir, f))])
+    counts.append(n)
+
+total = sum(counts)
+class_weights_dict = {
+    i: total / (num_classes * c) for i, c in enumerate(counts)
+}
+print("Cantidad por clase:", dict(zip(class_names, counts)))
+print("Pesos por clase:", class_weights_dict)
 
 AUTOTUNE = tf.data.AUTOTUNE
 train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
@@ -61,7 +80,7 @@ model = models.Sequential([
     layers.Flatten(),
     layers.Dense(256, activation="relu"),
     layers.Dropout(0.5),
-    layers.Dense(len(class_names), activation="softmax")
+    layers.Dense(num_classes, activation="softmax")
 ])
 
 model.compile(
@@ -75,28 +94,21 @@ model.summary()
 callbacks = [
     EarlyStopping(patience=5, restore_best_weights=True),
     ReduceLROnPlateau(factor=0.5, patience=3),
-    ModelCheckpoint("models/best_model.keras", save_best_only=True)
+    ModelCheckpoint("models/best_model.keras", save_best_only=True) 
 ]
-
-class_weights_dict = {
-    0: 0.85,  # Broken soybeans
-    1: 0.86,  # Intact soybeans
-    2: 1.49,  # Skin-damaged soybeans 
-    3: 1.01   # Spotted soybeans
-}
 
 history = model.fit(
     train_ds,
     validation_data=val_ds,
     epochs=EPOCHS,
     callbacks=callbacks,
-    class_weight=class_weights_dict 
+    class_weight=class_weights_dict
 )
 
 MODEL_PATH = "models/seed_cnn.keras"
 model.save(MODEL_PATH)
 
+
 import json
 with open("models/class_indices.json", "w", encoding="utf-8") as f:
     json.dump({i: name for i, name in enumerate(class_names)}, f, indent=4)
-

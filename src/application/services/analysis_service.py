@@ -13,11 +13,12 @@ from src.infrastructure.sql_db import insert_report_group
 from src.infrastructure.mongo_db import save_analysis_group_safe
 
 
-BASE = Path(__file__).resolve().parents[2]
+BASE = Path(__file__).resolve().parents[3]   # raíz del proyecto
 MODEL_DIR = BASE / "models"
 MODEL_PATH = MODEL_DIR / "best_model.keras"
 CLASS_PATH = MODEL_DIR / "class_indices.json"
 IMG_SIZE = (128, 128)
+
 
 # --- Cargar modelo CNN y etiquetas ---
 print("[IA] Cargando modelo CNN...")
@@ -44,12 +45,9 @@ def preprocess_image(file_bytes):
 # --- Predicción CNN ---
 def analyze_image(img):
     """Ejecuta el modelo CNN para clasificar la imagen."""
-    
+    img_float = img.astype('float32')
+    preds = model.predict(np.expand_dims(img_float, 0))[0]
 
-    normalized_img = img.astype('float32') / 255.0 
-    
-    preds = model.predict(np.expand_dims(normalized_img, 0))[0] 
-    
     idx = int(np.argmax(preds))
     label = idx2class.get(str(idx), f"Clase {idx}")
     return label, float(preds[idx]), preds.tolist()

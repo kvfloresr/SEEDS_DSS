@@ -25,7 +25,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from src.infrastructure.sql_db import (
     get_users, insert_user, get_lots, insert_lot, get_samples, insert_sample, get_reports_sql, get_sql_connection, 
     delete_lot, delete_sample, update_user, delete_user, change_user_password, get_roles,
-    insert_producer, start_wizard_session, update_wizard_session, get_wizard_session, rollback_wizard_session, get_producer_by_cod_or_name, get_or_insert_producer
+    insert_producer, start_wizard_session, update_wizard_session, get_wizard_session, rollback_wizard_session, get_producer_by_cod_or_name, get_or_insert_producer, get_producers
 )
 from pathlib import Path
 import tensorflow as tf
@@ -59,12 +59,12 @@ jwt = JWTManager(app)
 
 
 try:
-    BASE = Path(__file__).resolve().parents[2]
+    BASE = Path(__file__).resolve().parents[2]   # raíz del proyecto
 
     DATA_DIR = BASE / "data" / "processed" / "test"
-    MODEL_PATH = BASE / "src" /"models"/ "seed_cnn.h5"
-    MODEL_DIR = BASE / "src" /"models"
-    CLASS_PATH = BASE /"src"/ "models" / "class_indices.json"
+    MODEL_PATH = BASE / "models" / "best_model.keras"
+    MODEL_DIR = BASE / "models"
+    CLASS_PATH = BASE / "models" / "class_indices.json"
     IMG_SIZE = (128, 128)
 
     print(f"[DEBUG] BASE path: {BASE}")
@@ -649,6 +649,23 @@ def predict_step_by_step_endpoint():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/producers", methods=["GET", "POST"])
+def manage_producers():
+    if request.method == "GET":
+        try:
+            search = request.args.get("search")
+            return jsonify(get_producers(search=search)), 200
+        except Exception as e:
+            app.logger.exception("Error obteniendo productores")
+            return jsonify({"error": str(e)}), 500
+    # POST
+    data = request.json
+    try:
+        producer_id = get_or_insert_producer(data["name"], data["phone"], data["address"], data["cod_producer"])
+        return jsonify({"message": "Productor registrado", "producer_id": producer_id}), 201
+    except Exception as e:
+        app.logger.exception("Error creando productor")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False)
