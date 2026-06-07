@@ -23,8 +23,8 @@ from src.presentation.reports.pdf_report_generator import generate_pdf_in_memory
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity, verify_jwt_in_request, get_jwt
 from werkzeug.security import check_password_hash, generate_password_hash
 from src.infrastructure.sql_db import (
-    get_users, insert_user, get_lots, insert_lot, get_samples, insert_sample, get_reports_sql, get_sql_connection, 
-    delete_lot, delete_sample, update_user, delete_user, change_user_password, get_roles,
+    delete_producer, get_users, insert_user, get_lots, insert_lot, get_samples, insert_sample, get_reports_sql, get_sql_connection, 
+    delete_lot, delete_sample, update_producer, update_user, delete_user, change_user_password, get_roles,
     insert_producer, start_wizard_session, update_wizard_session, get_wizard_session, rollback_wizard_session, get_producer_by_cod_or_name, get_or_insert_producer, get_producers
 )
 from pathlib import Path
@@ -35,6 +35,9 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, classification_report
 import seaborn as sns
 from src.tests.evaluate_real_cnn import predict_process, evaluate_model
+from src.application.services.seed_counter import count_from_bytes
+from flask import Response
+from src.interface.camera_stream import gen_frames, latest, latest_jpeg
 
 
 
@@ -649,7 +652,7 @@ def predict_step_by_step_endpoint():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/producers", methods=["GET", "POST"])
+@app.route("/api/producers", methods=["GET", "POST", "PUT", "DELETE"])
 def manage_producers():
     if request.method == "GET":
         try:
@@ -658,14 +661,77 @@ def manage_producers():
         except Exception as e:
             app.logger.exception("Error obteniendo productores")
             return jsonify({"error": str(e)}), 500
-    # POST
-    data = request.json
+
+    if request.method == "POST":
+        data = request.json
+        try:
+            producer_id = get_or_insert_producer(data["name"], data["phone"], data["address"], data["cod_producer"])
+            return jsonify({"message": "Productor registrado", "producer_id": producer_id}), 201
+        except Exception as e:
+            app.logger.exception("Error creando productor")
+            return jsonify({"error": str(e)}), 500
+
+    if request.method == "PUT":
+        data = request.json
+        producer_id = data.get("producer_id")
+        if not producer_id:
+            return jsonify({"error": "producer_id requerido"}), 400
+        try:
+            update_producer(producer_id, data["name"], data["cod_producer"], data["phone"], data["address"])
+            return jsonify({"message": "Productor actualizado"}), 200
+        except Exception as e:
+            app.logger.exception("Error actualizando productor")
+            return jsonify({"error": str(e)}), 500
+
+    if request.method == "DELETE":
+        data = request.json
+        producer_id = data.get("producer_id")
+        if not producer_id:
+            return jsonify({"error": "producer_id requerido"}), 400
+        try:
+            delete_producer(producer_id)
+            return jsonify({"message": "Productor eliminado"}), 200
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        except Exception as e:
+            app.logger.exception("Error eliminando productor")
+            return jsonify({"error": str(e)}), 500
+        
+@app.route("/api/count_seeds", methods=["POST"])
+def count_seeds():
+    """Recibe UNA foto (campo 'file') y devuelve el conteo REAL de semillas."""
     try:
-        producer_id = get_or_insert_producer(data["name"], data["phone"], data["address"], data["cod_producer"])
-        return jsonify({"message": "Productor registrado", "producer_id": producer_id}), 201
+        f = request.files.get("file")
+        if f is None:
+            return jsonify({"error": "falta el archivo 'file'"}), 400
+        params = {}
+        for k in ("min_area", "max_area", "thresh"):
+            if k in request.form:
+                params[k] = int(request.form[k])
+        result = count_from_bytes(f.read(), params)
+        if "error" in result:
+            return jsonify(result), 400
+        return jsonify(result), 200
     except Exception as e:
-        app.logger.exception("Error creando productor")
+        app.logger.exception("Error en count_seeds")
         return jsonify({"error": str(e)}), 500
+    
+@app.route("/api/camera/stream")
+def camera_stream():
+    camera = int(request.args.get("camera", 0))
+    backend = request.args.get("backend", "msmf")
+    return Response(gen_frames(camera, backend),
+                    mimetype="multipart/x-mixed-replace; boundary=frame")
+
+@app.route("/api/camera/counts")
+def camera_counts():
+    return jsonify(latest)
+
+@app.route("/api/camera/snapshot")
+def camera_snapshot():
+    if latest_jpeg["data"] is None:
+        return jsonify({"error": "camara iniciando"}), 503
+    return Response(latest_jpeg["data"], mimetype="image/jpeg")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=False)
+    app.run(host="0.0.0.0", port=8000, debug=False, threaded=True)

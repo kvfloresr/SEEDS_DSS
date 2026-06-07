@@ -602,3 +602,26 @@ def get_producers(search=None):
     rows = [dict(zip(cols, r)) for r in cursor.fetchall()]
     conn.close()
     return rows
+
+def update_producer(producer_id, name, cod_producer, phone, address):
+    conn = get_sql_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE Producers SET name = ?, cod_producer = ?, phone = ?, address = ? WHERE producer_id = ?",
+        (name, cod_producer, phone, address, producer_id)
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_producer(producer_id):
+    conn = get_sql_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM Producers WHERE producer_id = ?", (producer_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise ValueError("No se puede eliminar: el productor tiene lotes asociados.")
+    conn.close()
