@@ -99,8 +99,8 @@ try:
     _psa._idx2class = idx2class
     print("[DEBUG] Modelo compartido con per_seed_analysis OK")
 
-    # Pre-iniciar la cámara en segundo plano al arrancar el backend
-    _start_cam(cam_index=1, width=1280, height=720)
+    ## Pre-iniciar la cámara en segundo plano al arrancar el backend
+    _start_cam(width=1280, height=720)
     print("[DEBUG] Cámara pre-iniciada en segundo plano")
 
     print("[DEBUG] Creando feature_extractor...")
@@ -752,12 +752,30 @@ def analyze_per_seed_endpoint():
             return jsonify({"error": "No se recibieron imagenes"}), 400
         n_reject = int(request.form.get("n_reject", 0))
         n_total  = int(request.form.get("n_total",  0))
-        result   = analyze_per_seed([f.read() for f in files], n_reject, n_total)
+        mode     = request.form.get("mode", "multi")          # <-- AÑADIR
+        result   = analyze_per_seed([f.read() for f in files], n_reject, n_total, mode)  # <-- pasar mode
         if "error" in result:
             return jsonify(result), 500
         return jsonify(result), 200
     except Exception as e:
         app.logger.exception("Error en analyze_per_seed")
+        return jsonify({"error": str(e)}), 500
+    
+@app.route("/api/save_iniaf/<analysis_id>", methods=["POST"])
+def save_iniaf(analysis_id):
+    """Guarda el resumen INIAF en el documento del análisis para que el PDF lo incluya."""
+    try:
+        payload = request.json or {}
+        db = get_db()
+        res = db.analyses.update_one(
+            {"analysis_id": analysis_id},
+            {"$set": {"iniaf": payload}}
+        )
+        if res.matched_count == 0:
+            return jsonify({"error": "Análisis no encontrado"}), 404
+        return jsonify({"message": "INIAF guardado"}), 200
+    except Exception as e:
+        app.logger.exception("Error en save_iniaf")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":

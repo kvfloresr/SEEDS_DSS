@@ -10,15 +10,15 @@ VENTAJA ADICIONAL: la cámara se pre-inicia al arrancar el backend, así cuando
 el usuario llega al paso 4 ya está lista (sin espera).
 
 NOTAS DE ESTA VERSIÓN:
-  - Usa la webcam USB (índice 1 por defecto), no la cámara integrada (índice 0).
+- Usa la webcam USB (índice 1 por defecto), no la cámara integrada (índice 0).
     Cámbialo con la variable de entorno CAM_INDEX si hiciera falta.
-  - Fuerza el códec MJPG antes de fijar la resolución: sin esto muchas webcams
+- Fuerza el códec MJPG antes de fijar la resolución: sin esto muchas webcams
     USB usan YUY2 (sin comprimir), no sostienen 720p y devuelven frames negros
     o a ~5 FPS (lag / entrecortado).
-  - Warm-up al abrir: descarta los primeros frames negros mientras el sensor
+- Warm-up al abrir: descarta los primeros frames negros mientras el sensor
     ajusta la exposición, para que el stream NO empiece en negro.
-  - BUFFERSIZE=1 reduce la latencia (no acumula frames viejos).
-  - Procesa la detección cada 2 frames y re-codifica el snapshot solo de vez en
+- BUFFERSIZE=1 reduce la latencia (no acumula frames viejos).
+- Procesa la detección cada 2 frames y re-codifica el snapshot solo de vez en
     cuando, para no saturar la CPU.
 """
 
@@ -84,7 +84,7 @@ def _open_camera(index=CAM_INDEX, width=1280, height=720):
                 rw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 rh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                 bname = {cv2.CAP_DSHOW: "DSHOW", cv2.CAP_MSMF: "MSMF",
-                         cv2.CAP_ANY: "ANY"}.get(backend, str(backend))
+                        cv2.CAP_ANY: "ANY"}.get(backend, str(backend))
                 print(f"[CAM] Cámara {index} abierta con {bname} — {rw}x{rh}")
                 return cap, rw, rh
 
