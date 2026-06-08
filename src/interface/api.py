@@ -37,7 +37,8 @@ import seaborn as sns
 from src.tests.evaluate_real_cnn import predict_process, evaluate_model
 from src.application.services.seed_counter import count_from_bytes
 from flask import Response
-from src.interface.camera_stream import gen_frames, latest, latest_jpeg
+from src.interface.camera_stream import gen_frames, latest, latest_jpeg, start_camera as _start_cam
+from src.application.services.per_seed_analysis import analyze_per_seed
 
 
 
@@ -90,6 +91,17 @@ try:
     with open(CLASS_PATH, "r", encoding="utf-8") as f:
         idx2class = json.load(f)
     print(f"[DEBUG] Clases cargadas: {list(idx2class.keys())}")
+
+    # Inyectar el modelo ya cargado en per_seed_analysis para evitar cargarlo
+    # dos veces (TF falla en hilos secundarios al cargar el modelo de nuevo)
+    import src.application.services.per_seed_analysis as _psa
+    _psa._model = model
+    _psa._idx2class = idx2class
+    print("[DEBUG] Modelo compartido con per_seed_analysis OK")
+
+    # Pre-iniciar la cámara en segundo plano al arrancar el backend
+    _start_cam(cam_index=1, width=1280, height=720)
+    print("[DEBUG] Cámara pre-iniciada en segundo plano")
 
     print("[DEBUG] Creando feature_extractor...")
     feature_extractor = tf.keras.Model(
@@ -718,9 +730,8 @@ def count_seeds():
     
 @app.route("/api/camera/stream")
 def camera_stream():
-    camera = int(request.args.get("camera", 0))
-    backend = request.args.get("backend", "msmf")
-    return Response(gen_frames(camera, backend),
+    camera = int(request.args.get("camera", 1))
+    return Response(gen_frames(camera),
                     mimetype="multipart/x-mixed-replace; boundary=frame")
 
 @app.route("/api/camera/counts")
@@ -732,6 +743,22 @@ def camera_snapshot():
     if latest_jpeg["data"] is None:
         return jsonify({"error": "camara iniciando"}), 503
     return Response(latest_jpeg["data"], mimetype="image/jpeg")
+
+@app.route("/api/analyze_per_seed", methods=["POST"])
+def analyze_per_seed_endpoint():
+    try:
+        files = request.files.getlist("files")
+        if not files:
+            return jsonify({"error": "No se recibieron imagenes"}), 400
+        n_reject = int(request.form.get("n_reject", 0))
+        n_total  = int(request.form.get("n_total",  0))
+        result   = analyze_per_seed([f.read() for f in files], n_reject, n_total)
+        if "error" in result:
+            return jsonify(result), 500
+        return jsonify(result), 200
+    except Exception as e:
+        app.logger.exception("Error en analyze_per_seed")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False, threaded=True)
