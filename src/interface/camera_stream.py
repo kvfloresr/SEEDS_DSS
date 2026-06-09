@@ -1,27 +1,3 @@
-"""
-camera_stream.py — Cámara en un hilo de fondo dedicado.
-
-PROBLEMA QUE RESUELVE: MSMF (el backend de cámara de Windows) solo funciona
-en el hilo principal. Cuando Flask sirve el stream en un hilo secundario, MSMF
-falla con errores -1072873822. Solución: la cámara corre en UN hilo de fondo
-permanente; Flask solo lee el buffer de ese hilo.
-
-VENTAJA ADICIONAL: la cámara se pre-inicia al arrancar el backend, así cuando
-el usuario llega al paso 4 ya está lista (sin espera).
-
-NOTAS DE ESTA VERSIÓN:
-- Usa la webcam USB (índice 1 por defecto), no la cámara integrada (índice 0).
-    Cámbialo con la variable de entorno CAM_INDEX si hiciera falta.
-- Fuerza el códec MJPG antes de fijar la resolución: sin esto muchas webcams
-    USB usan YUY2 (sin comprimir), no sostienen 720p y devuelven frames negros
-    o a ~5 FPS (lag / entrecortado).
-- Warm-up al abrir: descarta los primeros frames negros mientras el sensor
-    ajusta la exposición, para que el stream NO empiece en negro.
-- BUFFERSIZE=1 reduce la latencia (no acumula frames viejos).
-- Procesa la detección cada 2 frames y re-codifica el snapshot solo de vez en
-    cuando, para no saturar la CPU.
-"""
-
 import os
 import platform
 import threading

@@ -365,7 +365,7 @@ def get_lots(user_id=None, search=None, producer=None, species=None, variety=Non
     query = """
         SELECT 
             l.lot_id, 
-            l.producer, 
+            ISNULL(p.name, l.producer) AS producer, 
             l.species, 
             l.variety, 
             l.category, 
@@ -373,6 +373,7 @@ def get_lots(user_id=None, search=None, producer=None, species=None, variety=Non
             u.name AS created_by_name
         FROM Lots l
         LEFT JOIN Users u ON l.created_by = u.user_id
+        LEFT JOIN Producers p ON l.producer_id = p.producer_id
         WHERE 1=1
     """
     params = []
@@ -381,7 +382,7 @@ def get_lots(user_id=None, search=None, producer=None, species=None, variety=Non
         params.append(user_id)
     
     if search:
-        query += " AND (l.producer LIKE ? OR l.species LIKE ? OR l.variety LIKE ? OR l.category LIKE ?)"
+        query += " AND (ISNULL(p.name, l.producer) LIKE ? OR l.species LIKE ? OR l.variety LIKE ? OR l.category LIKE ?)"
         search_param = f"%{search}%"
         params.extend([search_param] * 4)
     
@@ -476,10 +477,12 @@ def get_samples(user_id=None, search=None, lot_name=None, sample_date_from=None,
             s.sample_date,
             s.analyst,
             s.observations,
-            CONCAT(l.producer, ' - ', l.variety) AS lot_name,
-            l.created_by
+            CONCAT(ISNULL(p.name, l.producer), ' - ', l.variety) AS lot_name,
+            l.created_by,
+            ISNULL(p.name, l.producer) AS producer_name
         FROM Samples s
         LEFT JOIN Lots l ON s.lot_id = l.lot_id
+        LEFT JOIN Producers p ON s.producer_id = p.producer_id
         WHERE 1=1
     """
     params = []
@@ -488,12 +491,12 @@ def get_samples(user_id=None, search=None, lot_name=None, sample_date_from=None,
         query += " AND l.created_by = ?"
         params.append(user_id)
     if search:
-        query += " AND (s.analyst LIKE ? OR s.observations LIKE ? OR l.producer LIKE ? OR l.variety LIKE ?)"
+        query += " AND (s.analyst LIKE ? OR s.observations LIKE ? OR ISNULL(p.name, l.producer) LIKE ? OR l.variety LIKE ?)"
         search_param = f"%{search}%"
         params.extend([search_param] * 4)
     
     if lot_name:
-        query += " AND CONCAT(l.producer, ' - ', l.variety) LIKE ?"
+        query += " AND CONCAT(ISNULL(p.name, l.producer), ' - ', l.variety) LIKE ?"
         params.append(f"%{lot_name}%")
     
     if sample_date_from:
@@ -603,17 +606,6 @@ def get_producers(search=None):
     conn.close()
     return rows
 
-def update_producer(producer_id, name, cod_producer, phone, address):
-    conn = get_sql_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE Producers SET name = ?, cod_producer = ?, phone = ?, address = ? WHERE producer_id = ?",
-        (name, cod_producer, phone, address, producer_id)
-    )
-    conn.commit()
-    conn.close()
-
-
 def delete_producer(producer_id):
     conn = get_sql_connection()
     cursor = conn.cursor()
@@ -624,4 +616,15 @@ def delete_producer(producer_id):
         conn.rollback()
         conn.close()
         raise ValueError("No se puede eliminar: el productor tiene lotes asociados.")
+    conn.close()
+
+    
+def update_producer(producer_id, name, cod_producer, phone, address):
+    conn = get_sql_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE Producers SET name = ?, cod_producer = ?, phone = ?, address = ? WHERE producer_id = ?",
+        (name, cod_producer, phone, address, producer_id)
+    )
+    conn.commit()
     conn.close()

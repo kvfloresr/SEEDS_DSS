@@ -29,13 +29,12 @@ from src.application.services.analysis_service import preprocess_image
 BASE = Path(__file__).resolve().parents[2]
 
 DATA_DIR = BASE / "data" / "processed" / "test"
-MODEL_PATH = BASE / "src" / "models" / "seed_cnn.h5"  # Cambiado para usar el mismo modelo que analysis_service
-CLASS_PATH = BASE /"src" / "models" / "class_indices.json"  # Cambiado para usar el mismo class_indices que analysis_service
+MODEL_PATH = BASE / "models" / "best_model.keras"  
+CLASS_PATH = BASE /"src" / "models" / "class_indices.json"  
 
 IMG_SIZE = (128, 128)
 BATCH_SIZE = 32
 
-# Cargar modelo y clases globalmente (ahora usando las mismas rutas que analysis_service)
 model = load_model(MODEL_PATH)
 with open(CLASS_PATH, "r", encoding="utf-8") as f:
     idx2class = json.load(f)
@@ -137,7 +136,13 @@ def evaluate_real_model(user="Sistema"):
     
     # Reporte por clase
     print("\n===== CLASIFICATION REPORT =====")
-    report = classification_report(y_true, y_pred, target_names=class_names, output_dict=True)
+    report = classification_report(
+    y_true, y_pred,
+    labels=list(range(len(class_names))), 
+    target_names=class_names,
+    output_dict=True,
+    zero_division=0,
+)
     
     return {
         "timestamp": now,
@@ -253,44 +258,59 @@ def predict_process(buf):
         return {"error": "Error interno del servidor"}
 
 def evaluate_model(user="Sistema"):
+    # 1) Métricas principales — si esto falla, sí es error real
     try:
         metrics = evaluate_real_model(user=user)
-        
-        # Gráfico de métricas por clase (precision, recall, f1)
-        class_metrics = []
-        for cls in metrics["class_names"]:
-            if cls in metrics["classification_report"]:
-                class_metrics.append({
-                    "class": cls,
-                    "precision": metrics["classification_report"][cls]["precision"],
-                    "recall": metrics["classification_report"][cls]["recall"],
-                    "f1_score": metrics["classification_report"][cls]["f1-score"]
-                })
-        
-        # Matriz de confusión
-        y_true = np.concatenate([y.numpy() for _, y in tf.keras.utils.image_dataset_from_directory(DATA_DIR, image_size=IMG_SIZE, batch_size=32, shuffle=False)], axis=0)
-        y_pred = np.argmax(model.predict(tf.keras.utils.image_dataset_from_directory(DATA_DIR, image_size=IMG_SIZE, batch_size=32, shuffle=False)), axis=1)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return {"error": f"Error evaluando el modelo: {e}"}
+
+    # 2) Métricas por clase (defensivo: si falta una clave, no rompe)
+    class_metrics = []
+    report = metrics.get("classification_report", {}) or {}
+    for cls in metrics.get("class_names", []):
+        r = report.get(cls)
+        if isinstance(r, dict):
+            class_metrics.append({
+                "class": cls,
+                "precision": r.get("precision", 0.0),
+                "recall": r.get("recall", 0.0),
+                "f1_score": r.get("f1-score", 0.0),
+            })
+
+    # 3) Matriz de confusión EN SU PROPIO try: si falla, igual devolvemos métricas
+    cm_base64 = None
+    try:
+        ds = tf.keras.utils.image_dataset_from_directory(
+            DATA_DIR, image_size=IMG_SIZE, batch_size=32, shuffle=False
+        )
+        y_true = np.concatenate([y.numpy() for _, y in ds], axis=0)
+        y_pred = np.argmax(model.predict(ds, verbose=0), axis=1)
         cm = confusion_matrix(y_true, y_pred)
+
         plt.figure(figsize=(8, 6))
-        sns.heatmap(cm, annot=True, fmt='d', xticklabels=metrics["class_names"], yticklabels=metrics["class_names"], cmap='Blues')
-        plt.xlabel('Predicted')
-        plt.ylabel('True')
-        plt.title('Confusion Matrix')
+        sns.heatmap(
+            cm, annot=True, fmt='d',
+            xticklabels=metrics["class_names"],
+            yticklabels=metrics["class_names"],
+            cmap='Blues'
+        )
+        plt.xlabel('Predicho')
+        plt.ylabel('Real')
+        plt.title('Matriz de Confusión')
         buf = BytesIO()
         plt.savefig(buf, format='png', bbox_inches='tight')
         buf.seek(0)
-        cm_base64 = base64.b64encode(buf.read()).decode('utf-8')
+        cm_base64 = "data:image/png;base64," + base64.b64encode(buf.read()).decode('utf-8')
         plt.close()
-        
-        return {
-            "metrics": metrics,
-            "class_metrics": class_metrics,
-            "confusion_matrix_base64": f"data:image/png;base64,{cm_base64}"
-        }
     except Exception as e:
-        return {"error": str(e)}
-    
+        print(f"[WARN] No se pudo generar la matriz de confusión: {e}")
 
+    return {
+        "metrics": metrics,
+        "class_metrics": class_metrics,
+        "confusion_matrix_base64": cm_base64,
+    }
 
 if __name__ == "__main__":
     metrics = evaluate_real_model(user="Valeria")

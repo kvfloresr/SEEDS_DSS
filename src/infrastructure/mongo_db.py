@@ -125,11 +125,13 @@ def get_analyses(limit=10):
         })
     return results
 
-def get_reports(limit=10):
+def get_reports(limit=10, include_inactive=True):
     db = get_db()
     docs = db.analyses.find().sort("processed_at", -1).limit(limit) 
     results = [] 
     for d in docs: 
+        if not include_inactive and d.get("active", True) is False:
+            continue
         processed = d.get("processed_at") 
         results.append({ 
             "analysis_id": d.get("analysis_id"), 
@@ -137,7 +139,50 @@ def get_reports(limit=10):
             "filename": d.get("path"), 
             "predicted_class": d.get("predicted_class"),
             "probability": d.get("probability"),
+            "probability_vector": d.get("probability_vector", []),
             "features": d.get("features"),
+            "iniaf": d.get("iniaf"),                           # panel INIAF guardado
+            "generated_by": d.get("generated_by"),            # usuario que lo generó
+            "reviewed": d.get("reviewed", False),
+            "active": d.get("active", True),                  # para inactivar (soft-delete)
+            "review_notes": d.get("review_notes"),
             "processed_at": processed.strftime("%Y-%m-%d %H:%M:%S") if processed else None 
         }) 
     return results  
+
+
+def save_analysis_iniaf(analysis_id, iniaf):
+    """Guarda/actualiza el resumen INIAF (certificación) en el documento del análisis."""
+    db = get_db()
+    res = db.analyses.update_one(
+        {"analysis_id": analysis_id},
+        {"$set": {"iniaf": iniaf}}
+    )
+    return res.modified_count > 0
+
+
+def get_analysis_iniaf(analysis_id):
+    """Devuelve el resumen INIAF guardado de un análisis (o None)."""
+    db = get_db()
+    doc = db.analyses.find_one({"analysis_id": analysis_id}, {"iniaf": 1})
+    return doc.get("iniaf") if doc else None
+
+
+def set_analysis_active(analysis_id, active, notes=None):
+    """Inactiva o reactiva un análisis (NUNCA se borra de la base de datos)."""
+    db = get_db()
+    update = {"active": bool(active)}
+    if notes is not None:
+        update["review_notes"] = notes
+    res = db.analyses.update_one({"analysis_id": analysis_id}, {"$set": update})
+    return res.modified_count > 0
+
+
+def update_analysis_review(analysis_id, fields: dict):
+    """Edita campos revisables de un análisis (notas, revisado)."""
+    db = get_db()
+    allowed = {k: v for k, v in fields.items() if k in ("review_notes", "reviewed")}
+    if not allowed:
+        return False
+    res = db.analyses.update_one({"analysis_id": analysis_id}, {"$set": allowed})
+    return res.modified_count > 0

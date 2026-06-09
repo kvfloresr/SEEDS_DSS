@@ -1,21 +1,3 @@
-"""
-live_camera.py — Detección y conteo de semillas de soya en vivo.
-
-Hace, en tiempo real con una cámara web/USB:
-  1. DETECTA cada semilla y la marca con un recuadro.
-  2. CUENTA cuántas semillas de soya hay.
-  3. RECHAZA objetos que NO son soya (color/tamaño/forma) -> en rojo.
-
-Todo con visión por computador clásica (OpenCV). No usa la CNN.
-
-Controles:
-  q salir | s captura | i invertir mascara | h ver mascara (depuracion)
-
-Uso:
-    python -m src.live_camera
-    python -m src.live_camera --camera 1
-"""
-
 import argparse
 import platform
 import sys

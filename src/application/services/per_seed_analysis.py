@@ -1,19 +1,3 @@
-"""
-per_seed_analysis.py — Análisis por semilla con criterios INIAF 2022.
-
-MODOS:
-  - mode="multi"  : la foto tiene VARIAS semillas. Se segmenta y se clasifica
-                    cada una (recorte + CNN). Caso del muestreo en mesa/cámara.
-  - mode="single" : la foto ES UNA semilla (close-up). NO se divide: se clasifica
-                    la imagen completa con el CNN (como en el dataset original) y
-                    se le pone su máscara/contorno y sus métricas.
-
-Indicadores de calidad física (Tabla 3.1 INIAF):
-  Pureza física ≥ 98 % | Materia inerte ≤ 2 % | Daños mecánicos ≤ 1 %
-  Color uniforme (manchadas = 0 %) | Forma y tamaño en rango (inmaduras ≤ 2 %)
-Fuente: Compendio de Normas Nacionales sobre Semillas, INIAF 2022.
-"""
-
 import base64
 import json
 from pathlib import Path
@@ -112,13 +96,45 @@ def _seed_panel_and_metrics(crop):
     return panel, metrics
 
 
-def _classify_crop(crop, model, idx2class):
+def _seed_panel_and_metrics_single(crop):
+    """MODO 1 SEMILLA (close-up): la semilla es BRILLANTE y llena el cuadro, el
+    fondo es oscuro. Se usa Otsu SIN invertir (como analyze_morphology_visual),
+    al revés que en modo 'varias'. Devuelve (panel [recorte | contorno], metrics)."""
+    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, m = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)   # brillante = semilla
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, k, iterations=2)                 # rellena grietas internas
+    cnts, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    overlay = crop.copy()
+    metrics = None
+    if cnts:
+        c = max(cnts, key=cv2.contourArea)
+        area = cv2.contourArea(c)
+        per  = cv2.arcLength(c, True)
+        x, y, w, h = cv2.boundingRect(c)
+        hull = cv2.convexHull(c)
+        harea = cv2.contourArea(hull)
+        cv2.drawContours(overlay, [c], -1, (80, 220, 90), 2, cv2.LINE_AA)
+        metrics = {
+            "area_px":      int(area),
+            "diam_eq_px":   round(float(np.sqrt(4 * area / np.pi)), 1),
+            "circularidad": round(float((4 * np.pi * area) / (per * per)) if per else 0.0, 3),
+            "aspecto":      round(float(w / h) if h else 0.0, 2),
+            "solidez":      round(float(area / harea) if harea else 0.0, 3),
+        }
+    sep = np.full((crop.shape[0], 3, 3), 60, np.uint8)
+    panel = np.hstack([crop, sep, overlay])
+    return panel, metrics
+
+
+def _classify_crop(crop, model, idx2class, panel_fn=_seed_panel_and_metrics):
     """Clasifica un recorte 128x128 y arma su resultado (clase + panel + métricas)."""
     rgb   = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB).astype("float32")
     preds = model.predict(np.expand_dims(rgb, 0), verbose=0)[0]
     idx   = int(np.argmax(preds))
     cls_name = idx2class.get(str(idx), f"Clase {idx}")
-    panel, metrics = _seed_panel_and_metrics(crop)
+    panel, metrics = panel_fn(crop)
     return {
         "class":      cls_name,
         "label_es":   CLASS_LABELS_ES.get(cls_name, cls_name),
@@ -133,7 +149,7 @@ def _classify_whole_image(img_bgr, model, idx2class):
     """MODO 1 SEMILLA: la foto ES una semilla. No segmenta; clasifica la imagen
     completa (redimensionada a 128) como en el dataset original."""
     crop = cv2.resize(img_bgr, IMG_SIZE)
-    return [_classify_crop(crop, model, idx2class)]
+    return [_classify_crop(crop, model, idx2class, panel_fn=_seed_panel_and_metrics_single)]
 
 
 def _detect_and_classify(img_bgr, model, idx2class):

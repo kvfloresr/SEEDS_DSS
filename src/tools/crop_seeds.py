@@ -1,31 +1,3 @@
-"""
-crop_seeds.py — Recorta cada semilla individual de fotos con MUCHAS semillas,
-para construir el dataset de entrenamiento del CNN (que clasifica 1 semilla).
-
-IDEA: tu CNN solo sabe clasificar UNA semilla por imagen. Tus fotos nuevas tienen
-varias. Este script encuentra cada semilla y la guarda recortada usando EXACTAMENTE
-la misma detección y el mismo recorte que la app usa al predecir
-(per_seed_analysis._crop_seed + el mismo filtrado de _detect_and_classify).
-Como cada foto es de UNA sola clase, todos sus recortes heredan esa etiqueta.
-
-Por qué importa: si los recortes de entrenamiento no se parecen a los de inferencia,
-el modelo evalúa bien pero falla en la app. Al reutilizar las MISMAS funciones,
-quedan alineados por construcción.
-
-Uso (parada en la raíz del proyecto):
-    python -m src.tools.crop_seeds --input data/raw_multi --output data/raw
-
-Estructura de ENTRADA (una subcarpeta por clase, con tus fotos de varias semillas):
-    data/raw_multi/Broken soybeans/foto1.jpg
-    data/raw_multi/Immature soybeans/foto1.jpg
-    data/raw_multi/Intact soybeans/foto1.jpg
-    data/raw_multi/Skin-damaged soybeans/foto1.jpg
-    data/raw_multi/Spotted soybeans/foto1.jpg
-
-SALIDA: recortes individuales 128x128 en  data/raw/<clase>/
-        (luego tu script de split los reparte a data/processed/{train,val,test})
-"""
-
 import argparse
 from pathlib import Path
 

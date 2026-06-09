@@ -39,7 +39,10 @@ from src.application.services.seed_counter import count_from_bytes
 from flask import Response
 from src.interface.camera_stream import gen_frames, latest, latest_jpeg, start_camera as _start_cam
 from src.application.services.per_seed_analysis import analyze_per_seed
-
+from src.infrastructure.mongo_db import (
+    save_analysis_group_safe, get_db, get_reports as mongo_get_reports,
+    save_analysis_iniaf, get_analysis_iniaf, set_analysis_active, update_analysis_review
+)
 
 
 # Config
@@ -777,6 +780,44 @@ def save_iniaf(analysis_id):
     except Exception as e:
         app.logger.exception("Error en save_iniaf")
         return jsonify({"error": str(e)}), 500
+
+@app.route("/api/get_iniaf/<analysis_id>", methods=["GET"])
+def get_iniaf(analysis_id):
+    try:
+        return jsonify({"iniaf": get_analysis_iniaf(analysis_id)}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def _require_admin():
+    try:
+        verify_jwt_in_request()
+        if get_jwt().get("role_name") != "Administrador":
+            return False, (jsonify({"error": "Solo un administrador puede realizar esta accion"}), 403)
+        return True, None
+    except Exception:
+        return False, (jsonify({"error": "Token invalido"}), 401)
+
+@app.route("/api/analysis/<analysis_id>/inactivate", methods=["POST"])
+def inactivate_analysis(analysis_id):
+    ok, resp = _require_admin()
+    if not ok: return resp
+    notes = (request.json or {}).get("notes")
+    set_analysis_active(analysis_id, False, notes)
+    return jsonify({"message": "Analisis inactivado"}), 200
+
+@app.route("/api/analysis/<analysis_id>/activate", methods=["POST"])
+def activate_analysis(analysis_id):
+    ok, resp = _require_admin()
+    if not ok: return resp
+    set_analysis_active(analysis_id, True)
+    return jsonify({"message": "Analisis reactivado"}), 200
+
+@app.route("/api/analysis/<analysis_id>/review", methods=["PUT"])
+def review_analysis(analysis_id):
+    ok, resp = _require_admin()
+    if not ok: return resp
+    update_analysis_review(analysis_id, request.json or {})
+    return jsonify({"message": "Analisis actualizado"}), 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=False, threaded=True)
